@@ -56,6 +56,14 @@ Other common failures:
 - **Cloudflare added**: requests return 403/503, and logcat shows HTML instead of data. Open the source's site from the app once so Aidoku's WebView can solve the challenge.
 - **API sources** (mangadex, mangaplus, webtoon, …): JSON field renames in `models.rs`
 
+## Security
+
+- **CI is pinned.** Every GitHub Action is pinned to a commit SHA (tag in a trailing comment), and the aidoku CLI to one aidoku-rs commit in `.github/actions/install-aidoku-cli/action.yml`. To update one, resolve the new SHA (`gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`), test locally, then replace it.
+- **Dependencies:** `cargo install cargo-audit`, then `cargo audit -f sources/<id>/Cargo.lock`. Fix a vulnerable crate with `cargo update -p <crate>` in that source, then bump its version.
+- **Credentials:** a source must send cookies or tokens only to its own site, checked by host (never `url.contains(...)`). Image CDNs and mirrors are often run by third parties. See `is_eh_host` in `sources/multi.ehentai/src/helpers.rs`.
+- **Mirrors:** before adding or keeping a mirror domain, confirm it still serves the same site. Expired domains get bought and parked (as kagane.si was).
+- **Self-hosted sources** (Suwayomi, LANraragi): enter an `https://` server address unless the server is on your own network. The password or API key is sent to that address.
+
 ## License
 
 Apache-2.0 or MIT, same as upstream.
