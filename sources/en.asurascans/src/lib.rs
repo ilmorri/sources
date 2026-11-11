@@ -8,6 +8,7 @@ use aidoku::{
 	helpers::uri::QueryParameters,
 	imports::{
 		defaults::defaults_get,
+		html::Html,
 		net::{Request, TimeUnit, set_rate_limit},
 		std::parse_date,
 	},
@@ -22,6 +23,25 @@ use models::*;
 
 const BASE_URL: &str = "https://asurascans.com";
 const API_URL: &str = "https://api.asurascans.com/api";
+
+/// API request with a browser user agent (cloudflare challenges bare clients) and login headers.
+fn api_request(url: String) -> Result<Request> {
+	let mut req = Request::get(url)?.header(
+		"User-Agent",
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+	);
+	if let Ok(status) = auth::get_login_status() {
+		req.set_header("Authorization", &format!("Bearer {}", status.access_token));
+		req.set_header(
+			"Cookie",
+			&format!(
+				"access_token={}; refresh_token={}",
+				status.access_token, status.refresh_token
+			),
+		);
+	}
+	Ok(req)
+}
 
 struct AsuraScans;
 
@@ -112,81 +132,58 @@ impl Source for AsuraScans {
 		needs_details: bool,
 		needs_chapters: bool,
 	) -> Result<Manga> {
-		let url = helpers::get_manga_url(&manga.key);
-		let html = Request::get(&url)?.html()?;
-
+		// the /comics/ html pages sit behind a cloudflare challenge; the api does not
 		if needs_details {
-			manga.title = html
-				.select_first("h1.text-xl.font-semibold")
-				.and_then(|el| el.own_text())
-				.unwrap_or(manga.title);
-			manga.cover = html
-				.select_first("div#desktop-cover-container img")
-				.and_then(|el| el.attr("abs:src"));
-			manga.artists = html.select("a[href^=/browse?artist]").map(|els| {
-				els.filter_map(|el| el.text())
-					.filter(|s| s != "_")
-					.collect()
-			});
-			manga.authors = html.select("a[href^=/browse?author]").map(|els| {
-				els.filter_map(|el| el.text())
-					.filter(|s| s != "_")
-					.collect()
-			});
-			manga.description = html
-				.select_first("div#description-text")
-				.and_then(|el| el.text());
-			manga.url = Some(url);
-			manga.tags = html
-				.select("a[href^=/browse?genres=]")
-				.map(|els| els.filter_map(|el| el.text()).collect());
-			manga.status = html
-				.select_first(
-					"div.flex.gap-3.pt-4.border-t > div:nth-child(1) > div > span.text-base",
-				)
-				.and_then(|el| el.text())
-				.map(|s| match s.as_str() {
-					"ongoing" => MangaStatus::Ongoing,
-					"hiatus" => MangaStatus::Hiatus,
-					"completed" => MangaStatus::Completed,
-					"dropped" => MangaStatus::Cancelled,
-					_ => MangaStatus::Unknown,
+			let json = api_request(format!("{API_URL}/series/{}", manga.key))?
+				.json_owned::<serde_json::Value>()?;
+			let series = &json["series"];
+			let names = |field: &str| -> Option<Vec<String>> {
+				series[field]
+					.as_str()
+					.filter(|s| !s.is_empty() && *s != "_")
+					.map(|s| vec![s.into()])
+			};
+			if let Some(title) = series["title"].as_str() {
+				manga.title = title.into();
+			}
+			manga.cover = series["cover"].as_str().map(String::from);
+			manga.authors = names("author");
+			manga.artists = names("artist");
+			manga.description = series["description"]
+				.as_str()
+				.and_then(|d| Html::parse_fragment(d).ok()?.select_first("html")?.text());
+			manga.url = Some(helpers::get_manga_url(&manga.key));
+			let tags: Vec<String> = series["genres"]
+				.as_array()
+				.map(|arr| {
+					arr.iter()
+						.filter_map(|g| g["name"].as_str().map(String::from))
+						.collect()
 				})
 				.unwrap_or_default();
-			let tags = manga.tags.as_deref().unwrap_or_default();
-			manga.content_rating = if tags
-				.as_ref()
-				.iter()
-				.any(|e| matches!(e.as_str(), "Adult" | "Ecchi"))
-			{
+			manga.content_rating = if tags.iter().any(|e| matches!(e.as_str(), "Adult" | "Ecchi")) {
 				ContentRating::Suggestive
 			} else {
 				ContentRating::Safe
 			};
-			manga.viewer = html
-				.select_first(
-					"div.flex.gap-3.pt-4.border-t > div:nth-child(2) > div > span.text-base",
-				)
-				.and_then(|el| el.text())
-				.map(|s| match s.as_str() {
-					"manhwa" => Viewer::Webtoon,
-					"manhua" => Viewer::Webtoon,
-					"mangatoon" => Viewer::RightToLeft,
-					_ => Viewer::Webtoon,
-				})
-				.unwrap_or(Viewer::Webtoon);
+			manga.tags = Some(tags);
+			manga.status = match series["status"].as_str().unwrap_or_default() {
+				"ongoing" => MangaStatus::Ongoing,
+				"hiatus" => MangaStatus::Hiatus,
+				"completed" => MangaStatus::Completed,
+				"dropped" => MangaStatus::Cancelled,
+				_ => MangaStatus::Unknown,
+			};
+			manga.viewer = match series["type"].as_str().unwrap_or_default() {
+				"mangatoon" => Viewer::RightToLeft,
+				_ => Viewer::Webtoon,
+			};
 		}
 
 		if needs_chapters {
-			let island_props = html
-				.select_first(
-					"astro-island[component-url*=ChapterListReact], astro-island[opts*=ChapterListReact]",
-				)
-				.and_then(|el| el.attr("props"))
-				.ok_or_else(|| error!("Missing astro-island"))?;
-
-			let json = serde_json::from_str::<serde_json::Value>(&island_props)?;
-			let chapters_arr = json["chapters"][1]
+			let json = api_request(format!("{API_URL}/series/{}/chapters", manga.key))?
+				.json_owned::<serde_json::Value>()?;
+			let chapters_arr = json["data"]
 				.as_array()
 				.ok_or_else(|| error!("Missing chapters"))?;
 
@@ -197,18 +194,16 @@ impl Source for AsuraScans {
 				chapters_arr
 					.iter()
 					.filter_map(|obj| {
-						let obj = obj[1].as_object()?;
-
-						let locked = !is_subscribed
-							&& obj.get("is_premium")?[1].as_bool().unwrap_or_default();
+						let locked =
+							!is_subscribed && obj["is_premium"].as_bool().unwrap_or_default();
 						if skip_locked && locked {
 							return None;
 						}
 
-						let chapter_number = obj.get("number")?[1].as_f64().map(|f| f as f32)?;
+						let chapter_number = obj["number"].as_f64().map(|f| f as f32)?;
 						let key = chapter_number.to_string();
 						const DATE_FORMAT: &str = "yyyy-MM-dd'T'HH:mm:ss'Z'";
-						let date_uploaded = obj.get("published_at")?[1].as_str().and_then(|s| {
+						let date_uploaded = obj["published_at"].as_str().and_then(|s| {
 							if let Some((before_dot, _)) = s.split_once('.') {
 								parse_date(format!("{before_dot}Z"), DATE_FORMAT)
 							} else {
@@ -235,18 +230,7 @@ impl Source for AsuraScans {
 
 	fn get_page_list(&self, manga: Manga, chapter: Chapter) -> Result<Vec<Page>> {
 		let api_url = format!("{API_URL}/series/{}/chapters/{}", manga.key, chapter.key);
-		let mut api_req = Request::get(api_url)?;
-		if let Ok(status) = auth::get_login_status() {
-			api_req.set_header("Authorization", &format!("Bearer {}", status.access_token));
-			api_req.set_header(
-				"Cookie",
-				&format!(
-					"access_token={}; refresh_token={}",
-					status.access_token, status.refresh_token
-				),
-			);
-		}
-		if let Ok(json) = api_req.json_owned::<serde_json::Value>()
+		if let Ok(json) = api_request(api_url)?.json_owned::<serde_json::Value>()
 			&& let Some(page_arr) = json["data"]["chapter"]["pages"].as_array()
 		{
 			let pages: Vec<Page> = page_arr
@@ -528,3 +512,25 @@ register_source!(
 	WebLoginHandler,
 	NotificationHandler
 );
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use aidoku_test::aidoku_test;
+
+	#[aidoku_test]
+	fn refresh_and_read() {
+		let manga = Manga {
+			key: "absolute-regression".into(),
+			..Default::default()
+		};
+		let manga = AsuraScans.get_manga_update(manga, true, true).unwrap();
+		assert_eq!(manga.title, "Absolute Regression");
+		assert!(manga.cover.is_some(), "cover");
+		assert!(manga.description.is_some(), "description");
+		let chapters = manga.chapters.clone().unwrap();
+		assert!(chapters.len() > 100);
+		let first = chapters.last().unwrap().clone();
+		assert!(!AsuraScans.get_page_list(manga, first).unwrap().is_empty());
+	}
+}
