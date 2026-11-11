@@ -124,9 +124,8 @@ impl Post<'_> {
 				.as_ref()
 				.and_then(|s| Html::parse_fragment(s).ok())
 				.and_then(|html| {
-					html.select_first("body")
-						.expect("parsed fragment must have body")
-						.text_with_newlines()
+					// html root, not body: fragment parsers differ on creating a <body>
+					html.select_first("html")?.text_with_newlines()
 				})
 				.map(|s| s.trim().into()),
 			url: Some(format!("{}/series/{}", params.base_url, self.slug)),

@@ -128,9 +128,8 @@ pub trait Impl {
 		if let Some(content) = data.chapter.content.filter(|content| !content.is_empty()) {
 			// text content
 			let text = Html::parse_fragment(content)?
-				.select_first("body")
-				.expect("parsed fragment must have body")
-				.text_with_newlines()
+				.select_first("html")
+				.and_then(|el| el.text_with_newlines())
 				.ok_or(error!("Invalid chapter content"))?;
 			Ok(vec![Page {
 				content: PageContent::text(text),
