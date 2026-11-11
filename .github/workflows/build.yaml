@@ -42,22 +42,25 @@ jobs:
 
       - name: Build sources
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
+          # one broken source must not block deploying all the others
+          : > failed-sources.txt
           for source in sources/*; do
             [[ -f "$source/Cargo.toml" ]] || continue
 
             echo "::group::Packaging $source"
-            (
-              cd "$source"
-              aidoku package
-            )
+            if ! (cd "$source" && aidoku package); then
+              echo "::error::Failed to package $source"
+              rm -f "$source/package.aix" # never ship a stale package
+              echo "$source" >> failed-sources.txt
+            fi
             echo "::endgroup::"
           done
 
       - name: Build source list
         run: |
-          aidoku build sources/*/package.aix --name "Aidoku Community Sources"
+          aidoku build sources/*/package.aix --name "ilmorri Sources"
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4.7.2
@@ -76,3 +79,11 @@ jobs:
           name: packages
           path: public/sources/*.aix
           if-no-files-found: ignore
+
+      - name: Fail if any source failed to package
+        run: |
+          if [[ -s failed-sources.txt ]]; then
+            echo "::error::These sources failed and were left out of the list:"
+            cat failed-sources.txt
+            exit 1
+          fi

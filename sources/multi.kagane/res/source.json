@@ -2,7 +2,7 @@
 	"info": {
 		"id": "multi.kagane",
 		"name": "Kagane",
-		"version": 5,
+		"version": 6,
 		"urls": [
 			"https://kagane.cx",
 			"https://kagane.si",
@@ -12,23 +12,7 @@
 		],
 		"minAppVersion": "0.7.1",
 		"contentRating": 1,
-		"languages": [
-			"en",
-			"es",
-			"it",
-			"fr",
-			"tr",
-			"pt",
-			"pt-BR",
-			"pl",
-			"ru",
-			"de",
-			"id",
-			"vi",
-			"th",
-			"ar",
-			"he"
-		]
+		"languages": ["en"]
 	},
 	"config": {
 		"allowsBaseUrlSelect": true
