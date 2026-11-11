@@ -80,12 +80,6 @@ pub struct ChapterDto {
 
 #[derive(Default, Deserialize)]
 #[serde(default)]
-pub struct ChapterDetail {
-	pub chapter: ChapterPages,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(default)]
 pub struct ChapterPages {
 	pub pages: Vec<PageDto>,
 }

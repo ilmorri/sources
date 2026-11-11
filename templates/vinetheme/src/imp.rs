@@ -71,9 +71,9 @@ pub trait Impl {
 			"{}/series/comic/{}/chapter/{}",
 			params.base_url, manga.key, chapter.key
 		);
-		let detail: ChapterDetail = rsc::extract(&self.rsc_get(&url)?, "chapter")?;
+		// the payload has several "chapter" objects and only one carries the pages
+		let detail: ChapterPages = rsc::extract(&self.rsc_get(&url)?, "pages")?;
 		Ok(detail
-			.chapter
 			.pages
 			.into_iter()
 			.filter_map(|page| page.image_url)
