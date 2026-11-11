@@ -43,6 +43,8 @@ impl Impl for AquaManga {
 		madara::Params {
 			base_url: BASE_URL.into(),
 			use_load_more_request: LoadMoreStrategy::Never,
+			// the manga-chapters-holder div (old admin-ajax id) is gone; /ajax/chapters/ works
+			use_new_chapter_endpoint: true,
 			default_viewer: Viewer::Webtoon,
 			..Default::default()
 		}
