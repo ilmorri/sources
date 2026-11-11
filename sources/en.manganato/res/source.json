@@ -2,8 +2,8 @@
 	"info": {
 		"id": "en.manganato",
 		"name": "MangaNato",
-		"version": 8,
-		"urls": ["https://www.manganato.gg", "https://www.natomanga.com"],
+		"version": 9,
+		"urls": ["https://www.manganato.gg"],
 		"contentRating": 1,
 		"languages": ["en"],
 		"minAppVersion": "0.7.1"
