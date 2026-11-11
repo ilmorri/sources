@@ -3,8 +3,8 @@
 		"id": "en.qiscans",
 		"name": "Qi Scans",
 		"altNames": ["Qi Manga"],
-		"version": 2,
-		"url": "https://qimanga.org",
+		"version": 3,
+		"url": "https://qimanga.com",
 		"contentRating": 0,
 		"languages": ["en"],
 		"minAppVersion": "0.7.1"

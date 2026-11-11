@@ -2,7 +2,7 @@
 use aidoku::{Source, alloc::String, imports::defaults::defaults_get, prelude::*};
 use mangabox::{Impl, MangaBox, Params};
 
-const BASE_URL: &str = "https://www.mangakakalot.gg";
+const BASE_URL: &str = "https://www.kakamanga.com";
 
 struct MangaKakalot;
 

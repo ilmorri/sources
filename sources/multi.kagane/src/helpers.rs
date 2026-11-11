@@ -20,7 +20,7 @@ use crate::models::{
 
 /// The mirror picked in the app; the first url in source.json until one is.
 pub fn base_url() -> String {
-	defaults_get::<String>("url").unwrap_or_else(|| String::from("https://kagane.cx"))
+	defaults_get::<String>("url").unwrap_or_else(|| String::from("https://kagane.moe"))
 }
 
 pub fn api_base() -> String {

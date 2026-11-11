@@ -2,13 +2,11 @@
 	"info": {
 		"id": "multi.kagane",
 		"name": "Kagane",
-		"version": 6,
+		"version": 7,
 		"urls": [
-			"https://kagane.cx",
-			"https://kagane.si",
 			"https://kagane.moe",
-			"https://kagane.net",
-			"https://kagane.org"
+			"https://kagane.cx",
+			"https://kagane.net"
 		],
 		"minAppVersion": "0.7.1",
 		"contentRating": 1,

@@ -2,9 +2,9 @@
 	"info": {
 		"id": "en.mangakakalot",
 		"name": "MangaKakalot",
-		"version": 5,
+		"version": 6,
 		"urls": [
-			"https://www.mangakakalot.gg",
+			"https://www.kakamanga.com",
 			"https://www.mangakakalove.com"
 		],
 		"contentRating": 1,

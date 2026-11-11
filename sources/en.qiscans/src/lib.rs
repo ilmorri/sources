@@ -2,7 +2,7 @@
 use aidoku::{Source, prelude::*};
 use ezmanhwa::{EzManhwa, Impl, Params};
 
-const BASE_URL: &str = "https://qimanga.org";
+const BASE_URL: &str = "https://qimanga.com";
 const API_URL: &str = "https://api.qimanhwa.com/api/v1";
 
 struct QiScans;
