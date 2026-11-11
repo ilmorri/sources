@@ -11,7 +11,7 @@ Then remove the community list, so its updates don't replace your fixes.
 ```sh
 cd sources/en.<name>
 # edit src/lib.rs, or templates/<template>/src/ if the bug is in the shared theme
-cargo test                       # live-site tests (#[aidoku_test]); needs aidoku-test-runner
+cargo test                       # live-site tests; only 18 sources have them (grep -rl aidoku_test sources/*/src)
 aidoku package && aidoku verify package.aix
 aidoku serve package.aix         # optional: test on the phone before pushing
 aidoku logcat                    # live println!/errors from the phone while you use the source
