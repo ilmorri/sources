@@ -1,4 +1,4 @@
-use crate::{EHentai, USER_AGENT, models::EHGalleryItem, parser::*, settings::*};
+use crate::{EHentai, helpers::eh_request, models::EHGalleryItem, parser::*, settings::*};
 use aidoku::{
 	Home, HomeComponent, HomeComponentValue, HomeLayout, HomePartialResult, Link, Listing,
 	ListingKind, Manga, Result,
@@ -186,11 +186,7 @@ impl Home for EHentai {
 			)
 		});
 
-		let make_req = |url: &str| -> Result<Request> {
-			Ok(Request::get(url)?
-				.header("Cookie", &cookies)
-				.header("User-Agent", USER_AGENT))
-		};
+		let make_req = |url: &str| -> Result<Request> { eh_request(url, &cookies, None) };
 
 		// Build all requests
 		let top_yesterday_req = make_req("https://e-hentai.org/toplist.php?tl=15&p=0")?;

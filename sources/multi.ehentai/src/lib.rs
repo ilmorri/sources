@@ -571,16 +571,10 @@ impl ImageRequestProvider for EHentai {
 									Some(nl),
 									&cookies,
 								) {
-								return Ok(Request::get(retry_url)?
-									.header("Cookie", &cookies)
-									.header("User-Agent", USER_AGENT)
-									.header("Referer", &base_url));
+								return eh_request(&retry_url, &cookies, Some(&base_url));
 							}
 						} else {
-							return Ok(Request::get(img_url)?
-								.header("Cookie", &cookies)
-								.header("User-Agent", USER_AGENT)
-								.header("Referer", &base_url));
+							return eh_request(&img_url, &cookies, Some(&base_url));
 						}
 					}
 				} else {
@@ -594,16 +588,10 @@ impl ImageRequestProvider for EHentai {
 								&& let Some((retry_url, _)) =
 									api_showpage(&gid, &imgkey, page, &showkey, Some(nl), &cookies)
 							{
-								return Ok(Request::get(retry_url)?
-									.header("Cookie", &cookies)
-									.header("User-Agent", USER_AGENT)
-									.header("Referer", &base_url));
+								return eh_request(&retry_url, &cookies, Some(&base_url));
 							}
 						} else {
-							return Ok(Request::get(img_url)?
-								.header("Cookie", &cookies)
-								.header("User-Agent", USER_AGENT)
-								.header("Referer", &base_url));
+							return eh_request(&img_url, &cookies, Some(&base_url));
 						}
 					}
 				}
@@ -612,10 +600,7 @@ impl ImageRequestProvider for EHentai {
 				if let Ok(html) = eh_get_html(&viewer_url, &cookies, USER_AGENT) {
 					let img_url = parse_image_page(&html).unwrap_or_default();
 					if !img_url.is_empty() && !img_url.contains("509") {
-						return Ok(Request::get(img_url)?
-							.header("Cookie", &cookies)
-							.header("User-Agent", USER_AGENT)
-							.header("Referer", &base_url));
+						return eh_request(&img_url, &cookies, Some(&base_url));
 					}
 					if let Some(nl) = parse_nl_value(&html) {
 						let retry_viewer = if viewer_url.contains('?') {
@@ -626,10 +611,7 @@ impl ImageRequestProvider for EHentai {
 						if let Ok(retry_html) = eh_get_html(&retry_viewer, &cookies, USER_AGENT) {
 							let retry_img = parse_image_page(&retry_html).unwrap_or_default();
 							if !retry_img.is_empty() {
-								return Ok(Request::get(retry_img)?
-									.header("Cookie", &cookies)
-									.header("User-Agent", USER_AGENT)
-									.header("Referer", &base_url));
+								return eh_request(&retry_img, &cookies, Some(&base_url));
 							}
 						}
 					}
@@ -637,10 +619,7 @@ impl ImageRequestProvider for EHentai {
 			}
 		}
 
-		Ok(Request::get(url)?
-			.header("Cookie", &cookies)
-			.header("User-Agent", USER_AGENT)
-			.header("Referer", &base_url))
+		eh_request(&url, &cookies, Some(&base_url))
 	}
 }
 

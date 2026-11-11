@@ -13,17 +13,51 @@ use aidoku::{
 	prelude::*,
 };
 
+/// Lowercased host of an absolute URL (no userinfo, port, path or query).
+fn url_host(url: &str) -> Option<String> {
+	let authority = url.split_once("://")?.1.split(['/', '?', '#']).next()?;
+	let host = authority.rsplit('@').next()?.split(':').next()?;
+	Some(host.to_ascii_lowercase())
+}
+
+fn is_host(url: &str, domain: &str) -> bool {
+	url_host(url).is_some_and(|h| h == domain || h.ends_with(&format!(".{domain}")))
+}
+
+pub fn is_exhentai(url: &str) -> bool {
+	is_host(url, "exhentai.org")
+}
+
+/// Session cookies (ipb_member_id / ipb_pass_hash) may only go to E-Hentai itself:
+/// gallery images are served by third-party Hentai@Home nodes (*.hath.network).
+pub fn is_eh_host(url: &str) -> bool {
+	is_host(url, "e-hentai.org") || is_exhentai(url)
+}
+
+/// GET with E-Hentai headers; cookies are attached only for E-Hentai hosts.
+pub fn eh_request(url: &str, cookies: &str, referer: Option<&str>) -> Result<Request> {
+	let mut req = Request::get(url)?.header("User-Agent", USER_AGENT);
+	if let Some(referer) = referer {
+		req = req.header("Referer", referer);
+	}
+	if is_eh_host(url) {
+		req = req.header("Cookie", cookies);
+	}
+	Ok(req)
+}
+
 pub fn eh_get_html(url: &str, cookies: &str, user_agent: &str) -> Result<Document> {
 	let do_request = |cookie_header: &str| -> Result<Response> {
-		Ok(Request::get(url)?
-			.header("Cookie", cookie_header)
-			.header("User-Agent", user_agent)
-			.send()?)
+		let mut req = Request::get(url)?.header("User-Agent", user_agent);
+		if is_eh_host(url) {
+			req = req.header("Cookie", cookie_header);
+		}
+		Ok(req.send()?)
 	};
 
 	let mut resp = do_request(cookies)?;
 
-	if url.contains("exhentai.org")
+	if is_exhentai(url)
 		&& let Some(set_cookie) = resp.get_header("Set-Cookie")
 	{
 		refresh_igneous_from_set_cookie(&set_cookie);
@@ -31,7 +65,7 @@ pub fn eh_get_html(url: &str, cookies: &str, user_agent: &str) -> Result<Documen
 
 	let doc = resp.get_html()?;
 
-	if url.contains("exhentai.org") {
+	if is_exhentai(url) {
 		let is_rejected = doc
 			.select_first("body")
 			.and_then(|b| b.select_first("div"))
@@ -87,7 +121,9 @@ pub fn eh_get_html(url: &str, cookies: &str, user_agent: &str) -> Result<Documen
 
 pub fn rewrite_domain(url: &str) -> String {
 	let domain = get_domain();
-	if url.contains("exhentai.org") {
+	if !is_eh_host(url) {
+		url.to_string()
+	} else if url.contains("exhentai.org") {
 		url.replacen("exhentai.org", &domain, 1)
 	} else if url.contains("e-hentai.org") {
 		url.replacen("e-hentai.org", &domain, 1)
@@ -181,4 +217,29 @@ pub fn api_imagedispatch(
 		.map(|s| s.to_string());
 
 	Some((img_url, nl_out))
+}
+
+#[cfg(test)]
+mod host_tests {
+	use super::*;
+	use aidoku_test::aidoku_test;
+
+	#[aidoku_test]
+	fn cookies_only_for_eh_hosts() {
+		assert!(is_eh_host("https://e-hentai.org/g/1/abc/"));
+		assert!(is_eh_host("https://exhentai.org/s/abc/1-1"));
+		assert!(is_eh_host("https://api.e-hentai.org/api.php"));
+		assert!(is_eh_host("https://E-Hentai.org:443/x"));
+		// Hentai@Home image nodes are third-party servers
+		assert!(!is_eh_host(
+			"https://yawydzp.sonkpjwpofia.hath.network:10443/h/abc/x.jpg"
+		));
+		// substring tricks must not pass
+		assert!(!is_eh_host("https://evil.example/?u=exhentai.org"));
+		assert!(!is_eh_host("https://exhentai.org.evil.example/"));
+		assert!(!is_eh_host("https://notexhentai.org/"));
+		assert!(!is_eh_host("https://exhentai.org@evil.example/"));
+		assert!(is_exhentai("https://exhentai.org/"));
+		assert!(!is_exhentai("https://e-hentai.org/?r=exhentai.org"));
+	}
 }
